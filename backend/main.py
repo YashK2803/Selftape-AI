@@ -13,6 +13,9 @@ import dialogue_runner
 from models import Base
 import json
 from cartesia import Cartesia
+import json
+import threading
+import queue
 
 Base.metadata.create_all(bind=engine)
 
@@ -187,6 +190,13 @@ async def upload_pdf(
 @app.websocket("/ws-dialogue/")
 async def websocket_dialogue(websocket: WebSocket):
     await websocket.accept()
+
+    # Create session-specific resources
+    tts_queue = queue.Queue()
+    ack_queue = queue.Queue()
+    speak_lock = threading.Lock()
+    is_speaking_flag = [False]  # list to allow mutable boolean
+
     try:
         init_msg = await websocket.receive_text()
 
@@ -206,14 +216,34 @@ async def websocket_dialogue(websocket: WebSocket):
         script_text = data["script"]
         user_roles = set(data["user_roles"])
         ai_roles = data["ai_character_genders"]
-        # print(script_text)
-        await dialogue_runner._run_session(script_text, user_roles, ai_roles, websocket)
+
+        # ✅ Start TTS thread for this user/session
+        dialogue_runner.start_tts_thread(
+            websocket,
+            asyncio.get_running_loop(),
+            tts_queue,
+            ack_queue,
+            speak_lock,
+            is_speaking_flag
+        )
+
+        # ✅ Run the dialogue session using isolated resources
+        await dialogue_runner._run_session(
+            script_text,
+            user_roles,
+            ai_roles,
+            websocket,
+            tts_queue,
+            ack_queue,
+            is_speaking_flag
+        )
 
     except WebSocketDisconnect:
         print("[WebSocket] Client disconnected")
     except Exception as e:
         print("[WebSocket Error]", e)
         await websocket.close()
+
 
 # @app.websocket("/ws-dialogue/")
 # async def websocket_endpoint(ws: WebSocket):

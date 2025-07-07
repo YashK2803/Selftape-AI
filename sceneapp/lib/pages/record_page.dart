@@ -56,12 +56,12 @@ class _RecordingPageState extends State<RecordingPage> {
     try {
       await Permission.microphone.request();
       await _player.openPlayer();
-      
+
       // Set up player subscription to track playback state
       _player.onProgress!.listen((e) {
         // Handle progress if needed
       });
-      
+
       setState(() {
         _isPlayerInited = true;
       });
@@ -150,10 +150,10 @@ class _RecordingPageState extends State<RecordingPage> {
 
     try {
       debugPrint('[Player] Starting playback of ${audioBytes.length} bytes');
-      
+
       // Stop listening while AI is speaking
       _stopListening();
-      
+
       setState(() {
         _isPlaying = true;
       });
@@ -168,13 +168,18 @@ class _RecordingPageState extends State<RecordingPage> {
           setState(() {
             _isPlaying = false;
           });
-          // Resume listening after AI finishes speaking
+
+          if (_channel != null) {
+            _channel!.sink.add(jsonEncode({"done": true}));
+            debugPrint('[WS] Sent playback done ack');
+          }
+
           if (_isRecording) {
             _startListening();
           }
         },
       );
-      
+
       debugPrint('[Player] Audio playback started successfully');
     } catch (e, st) {
       debugPrint('[Player Error]: $e\n$st');
@@ -196,8 +201,10 @@ class _RecordingPageState extends State<RecordingPage> {
       _channel!.stream.listen(
         (message) async {
           try {
-            debugPrint('[WS Response]: Received message of type ${message.runtimeType}');
-            
+            debugPrint(
+              '[WS Response]: Received message of type ${message.runtimeType}',
+            );
+
             if (message is String) {
               try {
                 final decoded = json.decode(message);
@@ -211,7 +218,9 @@ class _RecordingPageState extends State<RecordingPage> {
               debugPrint('[WS Binary Audio]: Received ${message.length} bytes');
               await _playAudioFromBytes(message);
             } else if (message is Uint8List) {
-              debugPrint('[WS Uint8List Audio]: Received ${message.length} bytes');
+              debugPrint(
+                '[WS Uint8List Audio]: Received ${message.length} bytes',
+              );
               await _playAudioFromBytes(message.toList());
             }
           } catch (e, st) {
@@ -238,10 +247,9 @@ class _RecordingPageState extends State<RecordingPage> {
 
       _channel!.sink.add(initPayload);
       debugPrint('🔥 Sent initPayload: $initPayload');
-      
+
       // Start listening for speech after WebSocket is connected
       await Future.delayed(const Duration(milliseconds: 500));
-      
     } catch (e) {
       debugPrint('[WS Init Error]: $e');
     }
@@ -255,7 +263,7 @@ class _RecordingPageState extends State<RecordingPage> {
         final XFile file = await _controller!.stopVideoRecording();
         setState(() => _isRecording = false);
         _stopListening();
-        
+
         // Stop any ongoing playback
         if (_isPlaying) {
           await _player.stopPlayer();
@@ -513,14 +521,16 @@ class _RecordingPageState extends State<RecordingPage> {
                           children: [
                             Icon(
                               _speech.isListening ? Icons.mic : Icons.mic_off,
-                              color: _speech.isListening ? Colors.green : Colors.grey,
+                              color: _speech.isListening
+                                  ? Colors.green
+                                  : Colors.grey,
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              _speech.isListening 
-                                ? 'Listening for your speech...' 
-                                : _isPlaying 
-                                  ? 'AI is speaking...' 
+                              _speech.isListening
+                                  ? 'Listening for your speech...'
+                                  : _isPlaying
+                                  ? 'AI is speaking...'
                                   : 'Ready to listen',
                               style: TextStyle(
                                 color: Colors.green.shade700,
