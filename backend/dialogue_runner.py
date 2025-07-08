@@ -4,7 +4,9 @@ import threading
 import time
 import queue
 from fastapi import WebSocket
+from fastapi import WebSocketDisconnect
 from cartesia import Cartesia
+from rapidfuzz import fuzz
 
 # === CONFIG ===
 CARTESIA_API_KEY = 'sk_car_3vt7G9MRLjkkwa1dE1ZaUi'
@@ -64,7 +66,7 @@ def tts_worker(ws: WebSocket, loop, tts_queue, ack_queue, speak_lock, is_speakin
                 ).result()
 
                 print("[TTS] Waiting for frontend to finish playback...")
-                ack_queue.get()  # This blocks until frontend sends done
+                ack_queue.get()
                 print("[TTS] Frontend confirmed playback done.")
 
         except Exception as e:
@@ -84,19 +86,39 @@ async def wait_until_tts_done(tts_queue):
     while not tts_queue.empty():
         await asyncio.sleep(0.1)
 
-async def listen_for_ack(websocket: WebSocket, ack_queue: queue.Queue):
+# ✅ New unified listener for both ACK and STT
+async def websocket_message_router(websocket: WebSocket, ack_queue: queue.Queue, expected_user_lines_queue: queue.Queue):
     while True:
         try:
             recv = await websocket.receive()
             if isinstance(recv, bytes):
                 continue  # ignore raw audio
             result = json.loads(recv["text"])
-            print(result)
-            if result.get("done") is True:
+
+            # STT
+            if "transcript" in result:
+                user_input = result["transcript"].strip()
+                if not expected_user_lines_queue.empty():
+                    expected_line = expected_user_lines_queue.queue[0]  # peek
+                    similarity = fuzz.ratio(user_input.lower(), expected_line.lower())
+                    print(f"[STT] Got: \"{user_input}\" | Expected: \"{expected_line}\" | Similarity: {similarity}")
+                    if similarity > 75:
+                        print("[STT] Match accepted. Proceeding to next line.")
+                        expected_user_lines_queue.get()
+                        await websocket.send_text(json.dumps({"next_turn": "user"}))
+                        print("[STT] Informed frontend: Next user turn — mic can restart")
+                    
+
+                    
+                    
+
+            # TTS ACK
+            elif result.get("done") is True:
                 print("[ACK] Received playback done from frontend")
                 ack_queue.put(True)
+
         except Exception as e:
-            print("[Ack Listener Error]", e)
+            print("[WebSocket Router Error]", e)
             break
 
 async def _run_session(script_text, user_roles, ai_character_genders, websocket,
@@ -104,7 +126,8 @@ async def _run_session(script_text, user_roles, ai_character_genders, websocket,
     script = parse_script_from_string(script_text)
     print(f"[Session] Roles: {user_roles}")
 
-    listener_task = asyncio.create_task(listen_for_ack(websocket, ack_queue))
+    expected_user_lines_queue = queue.Queue()
+    router_task = asyncio.create_task(websocket_message_router(websocket, ack_queue, expected_user_lines_queue))
 
     for entry in script:
         speaker = entry['speaker']
@@ -114,8 +137,23 @@ async def _run_session(script_text, user_roles, ai_character_genders, websocket,
             gender = ai_character_genders[speaker].upper()
             voice_id = GENDER_VOICE_MAP.get(gender, GENDER_VOICE_MAP["NEUTRAL"])
             speak(line, voice_id, tts_queue, is_speaking_flag)
+        # elif speaker in user_roles:
+        #     print(f"[Awaiting User Line]: {line}")
+        #     expected_user_lines_queue.put(line)
+        #     while not expected_user_lines_queue.empty():
+        #         await asyncio.sleep(0.1)
+        elif speaker in user_roles:
+            print(f"[Awaiting User Line]: {line}")
+            expected_user_lines_queue.put(line)
+
+            # Wait until this specific line is matched and dequeued
+            while not expected_user_lines_queue.empty() and expected_user_lines_queue.queue[0] == line:
+                await asyncio.sleep(0.1)
+
+                # await asyncio.sleep(0.1)
+
 
     await wait_until_tts_done(tts_queue)
     tts_queue.join()
-    listener_task.cancel()
+    router_task.cancel()
     print("[Session] Complete.")

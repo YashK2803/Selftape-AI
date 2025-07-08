@@ -105,25 +105,37 @@ class _RecordingPageState extends State<RecordingPage> {
   }
 
   Future<void> _startListening() async {
+    debugPrint('[STT] Initializing speech recognition...');
+    
     bool available = await _speech.initialize();
     if (available) {
+      debugPrint('[STT] Mic initialized. Listening for user speech...');
+      
       _speech.listen(
         onResult: (val) {
           if (val.finalResult && val.recognizedWords.isNotEmpty) {
             final transcript = val.recognizedWords;
+            debugPrint('[STT] Final recognized line: "$transcript"');
+            
             if (_channel != null) {
               final payload = jsonEncode({"transcript": transcript});
               _channel!.sink.add(payload);
               debugPrint('[STT Sent]: $payload');
+            } else {
+              debugPrint('[STT] WebSocket channel not connected');
             }
+          } else {
+            debugPrint('[STT] Partial or empty result received');
           }
         },
         listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 3),
+        pauseFor: const Duration(seconds: 8),
         partialResults: false,
         cancelOnError: true,
         listenMode: stt.ListenMode.confirmation,
       );
+
+      debugPrint('[STT] Now actively listening...');
     } else {
       debugPrint('[STT] Speech recognition not available');
     }
@@ -137,6 +149,8 @@ class _RecordingPageState extends State<RecordingPage> {
   }
 
   Future<void> _playAudioFromBytes(List<int> audioBytes) async {
+    debugPrint('[PLAYER] _playAudioFromBytes called with ${audioBytes.length} bytes');
+
     if (!_isPlayerInited) {
       debugPrint('[Player] Not initialized');
       return;
@@ -153,7 +167,7 @@ class _RecordingPageState extends State<RecordingPage> {
 
       // Stop listening while AI is speaking
       _stopListening();
-
+      debugPrint('[STT] Mic stopped for AI playback');
       setState(() {
         _isPlaying = true;
       });
@@ -175,6 +189,7 @@ class _RecordingPageState extends State<RecordingPage> {
           }
 
           if (_isRecording) {
+            debugPrint('[STT] Mic restarted after AI line');
             _startListening();
           }
         },
@@ -193,67 +208,146 @@ class _RecordingPageState extends State<RecordingPage> {
     }
   }
 
+  // Future<void> _startScriptDialogueWebSocket() async {
+  //   try {
+  //     final uri = Uri.parse('ws://${Config.IP_ADDRESS}:8000/ws-dialogue/');
+  //     _channel = IOWebSocketChannel.connect(uri);
+
+  //     _channel!.stream.listen(
+  //       (message) async {
+  //         try {
+  //           debugPrint(
+  //             '[WS Response]: Received message of type ${message.runtimeType}',
+  //           );
+
+  //           if (message is String) {
+  //             try {
+  //               final decoded = json.decode(message);
+  //               if (decoded is Map && decoded.containsKey("tts_text")) {
+  //                 debugPrint('[TTS Line]: ${decoded["tts_text"]}');
+  //               }
+  //             } catch (_) {
+  //               debugPrint('[WS Text]: $message');
+  //             }
+  //           } else if (message is List<int>) {
+  //             debugPrint('[WS Binary Audio]: Received ${message.length} bytes');
+  //             await _playAudioFromBytes(message);
+  //           } else if (message is Uint8List) {
+  //             debugPrint(
+  //               '[WS Uint8List Audio]: Received ${message.length} bytes',
+  //             );
+  //             await _playAudioFromBytes(message.toList());
+  //           }
+  //         } catch (e, st) {
+  //           debugPrint('[WS STREAM ERROR]: $e\n$st');
+  //         }
+  //       },
+  //       onError: (error) {
+  //         debugPrint('[WS Error]: $error');
+  //       },
+  //       onDone: () {
+  //         debugPrint('[WS Closed]');
+  //         if (_isRecording) {
+  //           _startListening(); // Resume listening when connection closes
+  //         }
+  //       },
+  //     );
+
+  //     // Send initialization payload
+  //     final initPayload = jsonEncode({
+  //       "script": widget.extractedText,
+  //       "user_roles": widget.userRole.split(",").map((e) => e.trim()).toList(),
+  //       "ai_character_genders": widget.aiCharacters,
+  //     });
+
+  //     _channel!.sink.add(initPayload);
+  //     debugPrint('🔥 Sent initPayload: $initPayload');
+
+  //     // Start listening for speech after WebSocket is connected
+  //     await Future.delayed(const Duration(milliseconds: 500));
+  //   } catch (e) {
+  //     debugPrint('[WS Init Error]: $e');
+  //   }
+  // }
+
+
   Future<void> _startScriptDialogueWebSocket() async {
-    try {
-      final uri = Uri.parse('ws://${Config.IP_ADDRESS}:8000/ws-dialogue/');
-      _channel = IOWebSocketChannel.connect(uri);
+  try {
+    final uri = Uri.parse('ws://${Config.IP_ADDRESS}:8000/ws-dialogue/');
+    _channel = IOWebSocketChannel.connect(uri);
 
-      _channel!.stream.listen(
-        (message) async {
-          try {
-            debugPrint(
-              '[WS Response]: Received message of type ${message.runtimeType}',
-            );
+    // Attach listener BEFORE sending anything
+    _channel!.stream.listen(
+      (message) async {
+        try {
+          debugPrint(
+            '[WS Response]: Received message of type ${message.runtimeType}',
+          );
+          debugPrint('[RAW WS MESSAGE] $message');
 
-            if (message is String) {
-              try {
-                final decoded = json.decode(message);
-                if (decoded is Map && decoded.containsKey("tts_text")) {
-                  debugPrint('[TTS Line]: ${decoded["tts_text"]}');
-                }
-              } catch (_) {
-                debugPrint('[WS Text]: $message');
+          if (message is String) {
+            try {
+              final decoded = json.decode(message);
+
+              // ✅ Handle TTS debug text
+              if (decoded is Map && decoded.containsKey("tts_text")) {
+                debugPrint('[TTS Line]: ${decoded["tts_text"]}');
               }
-            } else if (message is List<int>) {
-              debugPrint('[WS Binary Audio]: Received ${message.length} bytes');
-              await _playAudioFromBytes(message);
-            } else if (message is Uint8List) {
-              debugPrint(
-                '[WS Uint8List Audio]: Received ${message.length} bytes',
-              );
-              await _playAudioFromBytes(message.toList());
+
+              // ✅ NEW: Restart mic if backend says it's the user's turn
+              if (decoded is Map && decoded.containsKey("next_turn")) {
+                if (decoded["next_turn"] == "user") {
+                  debugPrint('[WS] Backend says it is now your turn. Restarting mic...');
+                  _startListening();
+                }
+              }
+
+            } catch (e) {
+              debugPrint('[WS Text Decode Error]: $e\nRaw message: $message');
             }
-          } catch (e, st) {
-            debugPrint('[WS STREAM ERROR]: $e\n$st');
+          } else if (message is List<int>) {
+            debugPrint('[WS Binary Audio]: Received ${message.length} bytes');
+            await _playAudioFromBytes(message);
+          } else if (message is Uint8List) {
+            debugPrint(
+              '[WS Uint8List Audio]: Received ${message.length} bytes',
+            );
+            await _playAudioFromBytes(message.toList());
+          } else {
+            debugPrint('[WS Unknown Type]: $message');
           }
-        },
-        onError: (error) {
-          debugPrint('[WS Error]: $error');
-        },
-        onDone: () {
-          debugPrint('[WS Closed]');
-          if (_isRecording) {
-            _startListening(); // Resume listening when connection closes
-          }
-        },
-      );
+        } catch (e, st) {
+          debugPrint('[WS STREAM ERROR]: $e\n$st');
+        }
+      },
+      onError: (error) {
+        debugPrint('[WS Error]: $error');
+      },
+      onDone: () {
+        debugPrint('[WS Closed]');
+        if (_isRecording) {
+          _startListening(); // Resume listening when connection closes
+        }
+      },
+    );
 
-      // Send initialization payload
-      final initPayload = jsonEncode({
-        "script": widget.extractedText,
-        "user_roles": widget.userRole.split(",").map((e) => e.trim()).toList(),
-        "ai_character_genders": widget.aiCharacters,
-      });
+    // Send initialization payload AFTER listener is ready
+    final initPayload = jsonEncode({
+      "script": widget.extractedText,
+      "user_roles": widget.userRole.split(",").map((e) => e.trim()).toList(),
+      "ai_character_genders": widget.aiCharacters,
+    });
 
-      _channel!.sink.add(initPayload);
-      debugPrint('🔥 Sent initPayload: $initPayload');
+    _channel!.sink.add(initPayload);
+    debugPrint('Sent initPayload: $initPayload');
 
-      // Start listening for speech after WebSocket is connected
-      await Future.delayed(const Duration(milliseconds: 500));
-    } catch (e) {
-      debugPrint('[WS Init Error]: $e');
-    }
+    // Optional: small delay before starting STT (if needed)
+    await Future.delayed(const Duration(milliseconds: 300));
+  } catch (e) {
+    debugPrint('[WS Init Error]: $e');
   }
+}
+
 
   Future<void> _recordVideo() async {
     if (_controller == null || !_controller!.value.isInitialized) return;
