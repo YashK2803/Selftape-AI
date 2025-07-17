@@ -33,7 +33,8 @@ class RecordingPage extends StatefulWidget {
 }
 
 class _RecordingPageState extends State<RecordingPage> {
-  final Color primaryColor = const Color(0xFFFFA69E);
+  final Color primaryColor = const Color(0xFF8A2BE2);
+  final Color bgcolor = const Color(0xFF1E1E1E);
   final FlutterSoundPlayer _player = FlutterSoundPlayer();
   bool _isPlayerInited = false;
   bool _isPlaying = false;
@@ -447,7 +448,7 @@ class _RecordingPageState extends State<RecordingPage> {
         preferredSize: const Size.fromHeight(100),
         child: Container(
           decoration: BoxDecoration(
-            color: primaryColor,
+            color: bgcolor,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.1),
@@ -470,7 +471,7 @@ class _RecordingPageState extends State<RecordingPage> {
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -480,7 +481,7 @@ class _RecordingPageState extends State<RecordingPage> {
                             _isRecording ? 'Recording...' : 'Recording Mode',
                             style: const TextStyle(
                               fontSize: 14,
-                              color: Colors.black87,
+                              color: Colors.white,
                               fontStyle: FontStyle.italic,
                             ),
                           ),

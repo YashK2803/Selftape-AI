@@ -102,7 +102,7 @@ async def websocket_message_router(websocket: WebSocket, ack_queue: queue.Queue,
                     expected_line = expected_user_lines_queue.queue[0]  # peek
                     similarity = fuzz.ratio(user_input.lower(), expected_line.lower())
                     print(f"[STT] Got: \"{user_input}\" | Expected: \"{expected_line}\" | Similarity: {similarity}")
-                    if similarity > 75:
+                    if similarity > 60:
                         print("[STT] Match accepted. Proceeding to next line.")
                         expected_user_lines_queue.get()
                         await websocket.send_text(json.dumps({"next_turn": "user"}))
@@ -128,8 +128,23 @@ async def _run_session(script_text, user_roles, ai_character_genders, websocket,
 
     expected_user_lines_queue = queue.Queue()
     router_task = asyncio.create_task(websocket_message_router(websocket, ack_queue, expected_user_lines_queue))
+    #ADDED
+    await asyncio.sleep(0.1)
+    #ADDED
+    chk=False
+    if script and script[0]['speaker'] in user_roles:
+        first_line = script[0]['line']
+        expected_user_lines_queue.put(first_line)
+        await websocket.send_text(json.dumps({"next_turn": "user"}))
+        print("[Init] First line is user - mic started")
+        while not expected_user_lines_queue.empty() and expected_user_lines_queue.queue[0] == first_line:
+            await asyncio.sleep(0.1)
+        chk = True
 
+
+    idx=0
     for entry in script:
+        idx=idx+1
         speaker = entry['speaker']
         line = entry['line']
 
@@ -137,14 +152,23 @@ async def _run_session(script_text, user_roles, ai_character_genders, websocket,
             gender = ai_character_genders[speaker].upper()
             voice_id = GENDER_VOICE_MAP.get(gender, GENDER_VOICE_MAP["NEUTRAL"])
             speak(line, voice_id, tts_queue, is_speaking_flag)
+            # #ADDED
+            # await wait_until_tts_done(tts_queue)
+            # #ADDED
         # elif speaker in user_roles:
         #     print(f"[Awaiting User Line]: {line}")
         #     expected_user_lines_queue.put(line)
         #     while not expected_user_lines_queue.empty():
         #         await asyncio.sleep(0.1)
         elif speaker in user_roles:
+            if(idx==1 and chk):
+                print("[Loop] Skipping first user line (already handled)")
+                continue
             print(f"[Awaiting User Line]: {line}")
             expected_user_lines_queue.put(line)
+
+            await websocket.send_text(json.dumps({"next_turn": "user"}))
+            print("[Backend] Informed frontend: Start user mic (first user line)")
 
             # Wait until this specific line is matched and dequeued
             while not expected_user_lines_queue.empty() and expected_user_lines_queue.queue[0] == line:

@@ -22,7 +22,10 @@ class _HomePageState extends State<HomePage>
   List<CameraDescription>? cameras;
   bool _loadingCameras = true;
 
-  final Color primaryColor = const Color(0xFFFFA69E);
+  // final Color primaryColor = const Color(0xFFFFA69E);
+  final Color primaryColor = const Color(0xFF8A2BE2); // Violet
+  final Color backgroundColor = const Color(0xFF1E1E1E); // Dark grey
+
   late AnimationController _rippleController;
   late Animation<double> _ripple1, _ripple2;
 
@@ -158,14 +161,14 @@ class _HomePageState extends State<HomePage>
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: backgroundColor,
 
       extendBodyBehindAppBar: true,
 
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
+        backgroundColor: backgroundColor,
         selectedItemColor: primaryColor,
-        unselectedItemColor: Colors.black,
+        unselectedItemColor: Colors.white,
         currentIndex: 0,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
@@ -228,7 +231,7 @@ class _HomePageState extends State<HomePage>
             right: 0,
             child: Container(
               decoration: BoxDecoration(
-                color: primaryColor,
+                color: backgroundColor,
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(30),
                   bottomRight: Radius.circular(30),
@@ -258,7 +261,7 @@ class _HomePageState extends State<HomePage>
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Colors.white,
                         ),
                       ),
                       SizedBox(height: 4),
@@ -266,7 +269,7 @@ class _HomePageState extends State<HomePage>
                         'Lights. Camera. Record!',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.black87,
+                          color: Colors.white,
                           fontStyle: FontStyle.italic,
                         ),
                       ),
@@ -274,7 +277,7 @@ class _HomePageState extends State<HomePage>
                   ),
                   IconButton(
                     onPressed: signUserOut,
-                    icon: const Icon(Icons.logout, color: Colors.black),
+                    icon: const Icon(Icons.logout, color: Colors.white),
                     tooltip: 'Logout',
                   ),
                 ],
@@ -296,7 +299,7 @@ class _HomePageState extends State<HomePage>
                     const Icon(
                       Icons.description,
                       size: 80,
-                      color: Colors.black87,
+                      color: Colors.white,
                     ),
                     const SizedBox(height: 10),
                     Text(
@@ -304,11 +307,12 @@ class _HomePageState extends State<HomePage>
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 30),
                     Card(
+                      color: Colors.grey[800],
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
@@ -326,13 +330,17 @@ class _HomePageState extends State<HomePage>
                               icon: const Icon(Icons.upload_file),
                               label: const Text('Upload PDF'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.black,
+                                backgroundColor: Colors.grey[900],
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 14,
                                   horizontal: 24,
                                 ),
-                                textStyle: const TextStyle(fontSize: 16),
+                                textStyle: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -342,24 +350,57 @@ class _HomePageState extends State<HomePage>
                             if (fileName != null)
                               Text(
                                 '📄 $fileName',
-                                style: TextStyle(color: Colors.grey[700]),
+                                style: TextStyle(color: Colors.white),
                               ),
                             const SizedBox(height: 10),
-                            ElevatedButton(
-                              onPressed: convertToText,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryColor,
-                                foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                  horizontal: 24,
-                                ),
-                                textStyle: const TextStyle(fontSize: 16),
-                                shape: RoundedRectangleBorder(
+                            // ElevatedButton(
+                            //   onPressed: convertToText,
+                            //   style: ElevatedButton.styleFrom(
+                            //     backgroundColor: primaryColor,
+                            //     foregroundColor: Colors.white,
+                            //     padding: const EdgeInsets.symmetric(
+                            //       vertical: 14,
+                            //       horizontal: 24,
+                            //     ),
+                            //     textStyle: const TextStyle(fontSize: 16),
+                            //     shape: RoundedRectangleBorder(
+                            //       borderRadius: BorderRadius.circular(12),
+                            //     ),
+                            //   ),
+                            //   child: const Text('Proceed with Recording'),
+                            // ),
+
+                            GestureDetector(
+                              onTap: convertToText,
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFFDA44bb), Color(0xFF8921aa)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
                                   borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black45,
+                                      blurRadius: 6,
+                                      offset: Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    'Proceed with Recording',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                               ),
-                              child: const Text('Proceed with Recording'),
                             ),
                           ],
                         ),

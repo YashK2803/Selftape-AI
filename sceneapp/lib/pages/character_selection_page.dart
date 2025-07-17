@@ -24,7 +24,9 @@ class CharacterSelectionPage extends StatefulWidget {
 
 class _CharacterSelectionPageState extends State<CharacterSelectionPage>
     with SingleTickerProviderStateMixin {
-  final Color primaryColor = const Color(0xFFFFA69E);
+  //final Color primaryColor = const Color(0xFFFFA69E);
+  final Color primaryColor = const Color(0xFF8A2BE2);
+  final Color bgcolor = const Color(0xFF1E1E1E);
   Map<String, String> characterMap = {}; // "Me" or "AI"
   Map<String, String> genderMap = {}; // "MALE" or "FEMALE" or "NEUTRAL"
 
@@ -65,7 +67,10 @@ class _CharacterSelectionPageState extends State<CharacterSelectionPage>
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: Colors.white,
+      // backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFF1E1E1E),
+ // dark greyish black
+
       body: Stack(
         children: [
           Positioned(
@@ -97,7 +102,7 @@ class _CharacterSelectionPageState extends State<CharacterSelectionPage>
             right: 0,
             child: Container(
               decoration: BoxDecoration(
-                color: primaryColor,
+                color: bgcolor,
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(30),
                   bottomRight: Radius.circular(30),
@@ -127,7 +132,7 @@ class _CharacterSelectionPageState extends State<CharacterSelectionPage>
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Colors.white,
                         ),
                       ),
                       SizedBox(height: 4),
@@ -135,7 +140,7 @@ class _CharacterSelectionPageState extends State<CharacterSelectionPage>
                         'Select Characters!',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.black87,
+                          color: Colors.white,
                           fontStyle: FontStyle.italic,
                         ),
                       ),
@@ -167,7 +172,11 @@ class _CharacterSelectionPageState extends State<CharacterSelectionPage>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ListTile(
-                              title: Text(character),
+                              title: Text(
+                                character,
+                                style: const TextStyle(color: Colors.white),
+                              ),
+
                               trailing: ToggleButtons(
                                 isSelected: [
                                   characterMap[character] == "Me",
@@ -180,7 +189,7 @@ class _CharacterSelectionPageState extends State<CharacterSelectionPage>
                                         : "AI";
                                   });
                                 },
-                                children: const [Text("Me"), Text("AI")],
+                                children: const [Text("Me", style: TextStyle(color: Colors.white)), Text("AI", style: TextStyle(color: Colors.white))],
                                 borderRadius: BorderRadius.circular(10),
                                 selectedColor: Colors.white,
                                 fillColor: primaryColor,
@@ -192,21 +201,22 @@ class _CharacterSelectionPageState extends State<CharacterSelectionPage>
                               ),
                               child: Row(
                                 children: [
-                                  const Text("Gender: "),
+                                  const Text("Gender: ", style: TextStyle(color: Colors.white)),
                                   DropdownButton<String>(
+                                    dropdownColor: Colors.black,
                                     value: genderMap[character],
                                     items: const [
                                       DropdownMenuItem(
                                         value: "MALE",
-                                        child: Text("Male"),
+                                        child: Text("Male", style: TextStyle(color: Colors.white)),
                                       ),
                                       DropdownMenuItem(
                                         value: "FEMALE",
-                                        child: Text("Female"),
+                                        child: Text("Female", style: TextStyle(color: Colors.white)),
                                       ),
                                       DropdownMenuItem(
                                         value: "NEUTRAL",
-                                        child: Text("Neutral"),
+                                        child: Text("Neutral", style: TextStyle(color: Colors.white)),
                                       ),
                                     ],
                                     onChanged: (value) {
