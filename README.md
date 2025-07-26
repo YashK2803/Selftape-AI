@@ -7,7 +7,7 @@
 ## Prerequisites
 
 - Flutter SDK installed: [flutter.dev/docs/get-started/install](https://flutter.dev/docs/get-started/install)
-- Python 3.7+ with `venv`
+- Python 3.9 with `venv`
 - Deepgram API key (for STT)
 - System TTS voices (Zira, David, etc.)
 
