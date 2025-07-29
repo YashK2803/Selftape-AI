@@ -130,7 +130,7 @@ class _RecordingPageState extends State<RecordingPage> {
           }
         },
         listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 8),
+        pauseFor: const Duration(seconds: 15),
         partialResults: false,
         cancelOnError: true,
         listenMode: stt.ListenMode.confirmation,
