@@ -92,6 +92,46 @@ def extract_lines_from_page(page):
         result = ocr.ocr(np.array(img))
         return [line[1][0] for line in result[0]] if result else []
 
+def check_pdf_page_count(pdf_path, max_pages=10):
+    """
+    Check if the PDF has fewer than the specified maximum number of pages.
+    
+    Args:
+        pdf_path (str): Path to the PDF file
+        max_pages (int): Maximum number of pages to check against (default: 10)
+    
+    Returns:
+        tuple: (bool, int) - (True if pages < max_pages, actual page count)
+    """
+    try:
+        doc = fitz.open(pdf_path)
+        page_count = len(doc)
+        doc.close()
+        return page_count < max_pages, page_count
+    except Exception as e:
+        print(f"Error reading PDF: {str(e)}")
+        return False, 0
+
+def get_pdf_page_count(pdf_path):
+    """
+    Get the number of pages in a PDF file.
+
+    Args:
+        pdf_path (str): Path to the PDF file
+
+    Returns:
+        int: Number of pages in the PDF (0 if an error occurs)
+    """
+    try:
+        import fitz  # PyMuPDF
+        doc = fitz.open(pdf_path)
+        page_count = len(doc)
+        doc.close()
+        return page_count
+    except Exception as e:
+        print(f"Error reading PDF: {str(e)}")
+        return 0
+
 def detect_pdf_type(pdf_path, sample_pages=3):
     doc = fitz.open(pdf_path)
     total_pages = len(doc)
@@ -109,10 +149,21 @@ def detect_pdf_type(pdf_path, sample_pages=3):
     doc.close()
     return 'text' if text_content_found else 'image'
 
-def extract_script(pdf_path):
+def extract_script(pdf_path, page_numbers=None):
+    """
+    Extract script from PDF with optional page number filtering.
+    
+    Args:
+        pdf_path (str): Path to the PDF file
+        page_numbers (list): List of page numbers to extract (0-indexed). 
+                           If None, extracts all pages except the first one.
+    
+    Returns:
+        str: Extracted script text
+    """
     pdf_type = detect_pdf_type(pdf_path)
     if pdf_type == 'image':
-        return extract_script_from_image_pdf(pdf_path)
+        return extract_script_from_image_pdf(pdf_path, page_numbers)
 
     doc = fitz.open(pdf_path)
     output_blocks = []
@@ -120,9 +171,17 @@ def extract_script(pdf_path):
     # Calculate minimum dialogue indent by sampling the document
     min_dialogue_indent = calculate_min_dialogue_indent(doc)
     
-    for page_num, page in enumerate(doc):
-        if page_num == 0:
-            continue  # Skip title page
+    # Determine which pages to process
+    if page_numbers is None:
+        # Default behavior: process all pages including title page
+        pages_to_process = range(len(doc))
+    else:
+        # Filter page numbers to ensure they're valid
+        pages_to_process = [p for p in page_numbers if 0 <= p < len(doc)]
+        print(f"Processing pages: {pages_to_process}")
+    
+    for page_num in pages_to_process:
+        page = doc[page_num]
         lines = extract_lines_from_page(page)
         i = 0
         while i < len(lines):
@@ -248,16 +307,35 @@ def extract_lines_from_image_page(page):
         return grouped_lines
     return []
 
-def extract_script_from_image_pdf(pdf_path):
+def extract_script_from_image_pdf(pdf_path, page_numbers=None):
+    """
+    Extract script from image-based PDF with optional page number filtering.
+    
+    Args:
+        pdf_path (str): Path to the PDF file
+        page_numbers (list): List of page numbers to extract (0-indexed). 
+                           If None, extracts all pages except the first one.
+    
+    Returns:
+        str: Extracted script text
+    """
     doc = fitz.open(pdf_path)
     output_blocks = []
     
     # For image PDFs, use a default minimum indent
     min_dialogue_indent = 20  # Pixels for image-based detection
     
-    for page_num, page in enumerate(doc):
-        if page_num == 0:
-            continue
+    # Determine which pages to process
+    if page_numbers is None:
+        # Default behavior: process all pages including title page
+        pages_to_process = range(len(doc))
+    else:
+        # Filter page numbers to ensure they're valid
+        pages_to_process = [p for p in page_numbers if 0 <= p < len(doc)]
+        print(f"Processing image PDF pages: {pages_to_process}")
+    
+    for page_num in pages_to_process:
+        page = doc[page_num]
         lines = extract_lines_from_image_page(page)
         i = 0
         while i < len(lines):
@@ -364,13 +442,17 @@ def split_dialogue_by_sentence(script_text):
             output_lines.append(line)
     return '\n'.join(output_lines)
 
-# Usage
+# # Usage examples
 # if __name__ == "__main__":
 #     # Example usage - replace with your PDF path
-#     pdf_path = "scripts/24hourcustody.pdf"  # Change this to your PDF path
+#     pdf_path = "scripts/FRIENDSHIP-BEST.pdf"  # Change this to your PDF path
     
 #     try:
-#         script_text = extract_script(pdf_path)
+#         # Check page count first
+#         is_small_pdf, page_count = check_pdf_page_count(pdf_path, max_pages=10)
+
+#         # Extract all pages (default behavior - now includes title page)
+#         script_text = extract_script(pdf_path,page_numbers=[1,5,8])
         
 #         # Save to file
 #         output_filename = "dialogue_only_script.txt"

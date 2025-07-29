@@ -1,6 +1,9 @@
 import asyncio
-from fastapi import FastAPI, File, UploadFile, Form, Depends, WebSocket
+import io
+from fastapi import FastAPI, File, UploadFile, Form, Depends, WebSocket, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from process_pdf import get_pdf_page_count
+from process_pdf import check_pdf_page_count
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from process_pdf import extract_script, get_unique_characters
@@ -141,6 +144,45 @@ def hash_script(text: str) -> str:
 def root():
     return {"message": "FastAPI is running :)"}
 
+
+from fastapi import HTTPException
+
+@app.post("/get-page-count/")
+async def get_page_count(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Save uploaded file
+        file_location = f"scripts/{file.filename}"
+        os.makedirs("scripts", exist_ok=True)
+
+        contents = await file.read()
+        with open(file_location, "wb") as f:
+            f.write(contents)
+
+        print(f"File saved to: {file_location}")
+
+        # ✅ Check page count correctly
+        is_valid, page_count = check_pdf_page_count(file_location)
+        print(f"Page count: {page_count}, Is valid: {is_valid}")
+
+        if not is_valid:
+            os.remove(file_location)
+            # Raise and let FastAPI handle this as 400
+            raise HTTPException(status_code=400, detail="Please upload PDFs with 10 or fewer pages.")
+
+        os.remove(file_location)
+        return {"page_count": page_count}
+
+    except HTTPException as http_exc:
+        # Let HTTPException pass through without converting to 500
+        raise http_exc
+    except Exception as e:
+        print(f"Exception occurred: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error reading PDF: {str(e)}")
+
+
 @app.post("/upload-pdf/")
 async def upload_pdf(
     file: UploadFile = File(...),
@@ -153,6 +195,65 @@ async def upload_pdf(
         shutil.copyfileobj(file.file, f)
 
     script_text = extract_script(file_location)
+    os.remove(file_location)
+
+    characters = get_unique_characters(script_text)
+    script_hash = hash_script(script_text)
+
+    existing = db.query(Script).filter_by(user_uid=user_uid, script_hash=script_hash).first()
+    if existing:
+        return {
+            "message": "Script already uploaded.",
+            "script_id": existing.id,
+            "text": existing.original_text,
+            "characters": existing.characters,
+            "script_hash": script_hash,
+            "user_uid": user_uid
+        }
+
+    new_script = Script(
+        user_uid=user_uid,
+        script_hash=script_hash,
+        original_text=script_text,
+        characters=characters
+    )
+    db.add(new_script)
+    db.commit()
+    db.refresh(new_script)
+
+    return {
+        "script_id": new_script.id,
+        "text": new_script.original_text,
+        "characters": new_script.characters,
+        "script_hash": script_hash,
+        "user_uid": user_uid
+    }
+
+
+from typing import List
+from fastapi import UploadFile, File, Form, Depends, APIRouter
+from sqlalchemy.orm import Session
+
+@app.post("/upload-pdf-with-pages/")
+async def upload_pdf_with_pages(
+    file: UploadFile = File(...),
+    user_uid: str = Form(...),
+    page_numbers: str = Form(...),  # received as JSON string
+    db: Session = Depends(get_db)
+):
+    try:
+        page_numbers_list = json.loads(page_numbers)
+        if not isinstance(page_numbers_list, list) or not all(isinstance(p, int) for p in page_numbers_list):
+            raise ValueError
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid page_numbers format")
+
+    file_location = f"scripts/{file.filename}"
+    os.makedirs("scripts", exist_ok=True)
+    with open(file_location, "wb") as f:
+        f.write(await file.read())
+
+    script_text = extract_script(file_location, page_numbers=page_numbers_list)
     os.remove(file_location)
 
     characters = get_unique_characters(script_text)

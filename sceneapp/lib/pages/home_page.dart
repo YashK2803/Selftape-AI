@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:camera/camera.dart';
 import 'package:sceneapp/pages/character_selection_page.dart';
 import 'package:sceneapp/ip_address.dart';
+import 'package:sceneapp/pages/page_selection.dart';
+
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -88,69 +90,79 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> convertToText() async {
-    if (filePath == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please upload a PDF first.')),
-      );
-      return;
-    }
-
-    final user = FirebaseAuth.instance.currentUser;
-    final userUid = user?.uid;
-
-    if (userUid == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be logged in.')),
-      );
-      return;
-    }
-
-    var request = http.MultipartRequest(
-      'POST',
-      Uri.parse('http://${Config.IP_ADDRESS}:8000/upload-pdf/'),
+  if (filePath == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please upload a PDF first.')),
     );
-    request.fields['user_uid'] = userUid;
-    request.files.add(await http.MultipartFile.fromPath('file', filePath!));
+    return;
+  }
 
-    try {
-      var response = await request.send();
-      if (response.statusCode == 200) {
-        final responseBody = await response.stream.bytesToString();
-        final responseJson = jsonDecode(responseBody);
-        final text = responseJson['text'].toString().replaceAll('\n', '\n');
-        final characters = List<String>.from(responseJson['characters']);
-        final scriptHash = responseJson['script_hash'].toString();
-        final userUid = responseJson['user_uid'].toString();
+  final user = FirebaseAuth.instance.currentUser;
+  final userUid = user?.uid;
 
-        if (cameras != null && cameras!.isNotEmpty) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CharacterSelectionPage(
-                extractedText: text,
-                cameras: cameras!,
-                characters: characters,
-                scriptHash: scriptHash,
-                userUid: userUid,
-              ),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Camera not available.')),
-          );
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${response.statusCode}')),
-        );
-      }
-    } catch (e) {
+  if (userUid == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('You must be logged in.')),
+    );
+    return;
+  }
+
+  // ✅ Check page count BEFORE navigating
+  final countRequest = http.MultipartRequest(
+    'POST',
+    Uri.parse('http://${Config.IP_ADDRESS}:8000/get-page-count/'),
+  );
+  countRequest.files.add(await http.MultipartFile.fromPath('file', filePath!));
+
+  try {
+    final countResponse = await countRequest.send();
+    final countBody = await countResponse.stream.bytesToString();
+
+    if (countResponse.statusCode == 400) {
+      final decoded = jsonDecode(countBody);
+      final errorMessage = decoded['detail'] ?? "PDF is too long.";
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to connect to backend.')),
+        SnackBar(content: Text(errorMessage)),
+      );
+      return;
+    } else if (countResponse.statusCode != 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $countBody")),
+      );
+      return;
+    }
+
+    // ✅ Success: proceed
+    final countData = jsonDecode(countBody);
+    final totalPages = countData['page_count'];
+
+    if (cameras != null && cameras!.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PageSelection(
+            filePath: filePath!,
+            fileName: fileName!,
+            userUid: userUid,
+            cameras: cameras!,
+            totalPages: totalPages,
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Camera not available.')),
       );
     }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Failed to check PDF page count.')),
+    );
   }
+}
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -325,34 +337,45 @@ class _HomePageState extends State<HomePage>
                         ),
                         child: Column(
                           children: [
-                            ElevatedButton.icon(
-                              onPressed: pickPdfFile,
-                              icon: const Icon(Icons.upload_file),
-                              label: const Text('Upload PDF'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey[900],
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                  horizontal: 24,
-                                ),
-                                textStyle: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
+                        ElevatedButton.icon(
+                          onPressed: pickPdfFile,
+                          icon: const Icon(Icons.upload_file),
+                          label: const Text('Upload PDF'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[900],
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                              horizontal: 24,
                             ),
-                            const SizedBox(height: 16),
-                            if (fileName != null)
-                              Text(
-                                '📄 $fileName',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            const SizedBox(height: 10),
+                            textStyle: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 14),
+                          child: Text(
+                            'Please upload PDFs with 10 or fewer pages.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        if (fileName != null)
+                          Text(
+                            '📄 $fileName',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        const SizedBox(height: 10),
+
                             // ElevatedButton(
                             //   onPressed: convertToText,
                             //   style: ElevatedButton.styleFrom(
