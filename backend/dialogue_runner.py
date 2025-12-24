@@ -95,42 +95,52 @@ async def websocket_message_router(websocket: WebSocket, ack_queue: queue.Queue,
         try:
             recv = await websocket.receive()
             if isinstance(recv, bytes):
-                continue  # ignore raw audio
+                continue
             result = json.loads(recv["text"])
 
-            # STT
             if "transcript" in result:
                 user_input = result["transcript"].strip()
                 if not expected_user_lines_queue.empty():
-                    expected_line = expected_user_lines_queue.queue[0]  # peek
+                    expected_line = expected_user_lines_queue.queue[0]
                     similarity = fuzz.ratio(user_input.lower(), expected_line.lower())
-                    print(f"[STT] Got: \"{user_input}\" | Expected: \"{expected_line}\" | Similarity: {similarity}")
+                    
+                    print(f"[STT] Score: {similarity}")
+
                     if similarity >= 50:
-                        print("[STT] Match accepted. Proceeding to next line.")
-                        expected_user_lines_queue.get()
-                        await websocket.send_text(json.dumps({"next_turn": "user"}))
-                        print("[STT] Informed frontend: Next user turn — mic can restart")
-                    else:
-                        print("Did not match. Try again")
-                        #the app will speak "Please try again"
-                        print(f"[STT] Low similarity ({similarity}). Triggering TTS: 'Please try again'")
-                        text = "Please try again"
-                        voice_id = GENDER_VOICE_MAP["NEUTRAL"]
-                        speak(text, voice_id, tts_queue, is_speaking_flag)
+                        # === SUCCESS SCENARIO ===
+                        print("[STT] Match! Triggering Positive Beep.")
+                        await asyncio.sleep(0.8)
                         
+                        # 1. Send Success Event (Plays Positive Beep)
+                        await websocket.send_text(json.dumps({"event": "success"}))
+                        
+                        # 2. Short pause so the beep doesn't overlap with the next action
+                        await asyncio.sleep(0.5) 
+                        
+                        # 3. Send Advance Event (Moves Script Highlighter)
+                        await websocket.send_text(json.dumps({"event": "advance"}))
+                        
+                        expected_user_lines_queue.get()
 
-                    
-                    
+                    else:
+                        # === FAILURE SCENARIO ===
+                        print("[STT] No match. Triggering Error Beep.")
+                        await asyncio.sleep(0.8)
+                        # 1. Send Retry Event (Plays Error Beep)
+                        await websocket.send_text(json.dumps({"event": "retry"}))
+                        
+                        # 2. Wait for beep to finish
+                        await asyncio.sleep(0.8) 
 
-            # TTS ACK
+                        # 3. Re-open Mic
+                        await websocket.send_text(json.dumps({"next_turn": "user"}))
+
             elif result.get("done") is True:
-                print("[ACK] Received playback done from frontend")
                 ack_queue.put(True)
 
         except Exception as e:
-            print("[WebSocket Router Error]", e)
+            print("[Router Error]", e)
             break
-
 async def _run_session(script_text, user_roles, ai_character_genders, websocket,
                        tts_queue, ack_queue, is_speaking_flag):
     script = parse_script_from_string(script_text)

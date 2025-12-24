@@ -31,7 +31,6 @@ dependencies:
   flutter:
     sdk: flutter
   camera: ^0.10.5+9   # check for latest version on pub.dev
-  path_provider: ^2.1.2
   image_picker: ^1.0.8  # Latest version
   gallery_saver_plus: ^3.2.8
 
@@ -48,6 +47,16 @@ dependencies:
   speech_to_text: ^7.1.0
   web_socket_channel: ^2.4.0
   flutter_sound_platform_interface: ^9.2.13
+  shared_preferences: ^2.5.3
+  intl: ^0.20.2
+  google_sign_in: ^6.2.1  # Add this
+  sign_in_with_apple: ^6.1.1 # Add this
+  cloud_firestore: ^5.0.0
+  firebase_storage: ^12.0.0
+  path_provider: ^2.1.2  # To find where to save files on the phone
+  share_plus: ^12.0.1    # To share files/links
+  dio: ^5.4.0
+  audioplayers: ^5.0.0
 
 
 
@@ -75,7 +84,10 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    - assets/images/
     - lib/images/
+    - assets/sounds/positive_beep.mp3
+    - assets/sounds/error_beep.mp3
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

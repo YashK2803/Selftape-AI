@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "516608041942",
+    "project_id": "selftape-ai",
+    "storage_bucket": "selftape-ai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:516608041942:android:df5dd32f785c33c05eba77",
+        "android_client_info": {
+          "package_name": "com.example.sceneapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCfMS_8GX9xhsow8Q2Ogvr035c7ix_HKKc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

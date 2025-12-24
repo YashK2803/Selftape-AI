@@ -1,26 +1,44 @@
 {
   "project_info": {
-    "project_number": "693716627139",
-    "project_id": "authforapp1",
-    "storage_bucket": "authforapp1.firebasestorage.app"
+    "project_number": "516608041942",
+    "project_id": "selftape-ai",
+    "storage_bucket": "selftape-ai.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:693716627139:android:5f14cfc3e6498ad803fc76",
+        "mobilesdk_app_id": "1:516608041942:android:df5dd32f785c33c05eba77",
         "android_client_info": {
           "package_name": "com.example.sceneapp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "516608041942-3susmi7dr0i2nluv1nd3ckf6fnp76gon.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.sceneapp",
+            "certificate_hash": "d4c1e76882b17446ec95f04499ada85fe631a49d"
+          }
+        },
+        {
+          "client_id": "516608041942-qdq8bug7pevuf5qdiq8gkt6ors0cr9dk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyAz_wTRhRCEw59t-WyskBTLrQdKTbm0jdE"
+          "current_key": "AIzaSyCfMS_8GX9xhsow8Q2Ogvr035c7ix_HKKc"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "516608041942-qdq8bug7pevuf5qdiq8gkt6ors0cr9dk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

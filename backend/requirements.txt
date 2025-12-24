@@ -1,8 +1,8 @@
 fastapi
 uvicorn
 python-multipart
-PyMuPDF  # or pdfplumber/pdfminer.six
-paddleocr
+pdfplumber
+pytesseract
 pillow
 sqlalchemy
 psycopg2-binary
