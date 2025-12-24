@@ -56,6 +56,13 @@ class _SignUpPageState extends State<SignUpPage> with SingleTickerProviderStateM
   }
 
 void signUserUp() async {
+  if (usernameController.text.trim().isEmpty ||
+        emailController.text.trim().isEmpty ||
+        passwordController.text.trim().isEmpty ||
+        confirmPasswordController.text.trim().isEmpty) {
+      _showErrorMessage("Please fill in all fields.", isError: true);
+      return;
+    }
     // Show loading circle
     showDialog(
       context: context,
@@ -103,22 +110,91 @@ void signUserUp() async {
     }
   }
 
-  void _showErrorMessage(String message) {
+ void _showErrorMessage(String message, {bool isError = false}) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: Text(message, style: const TextStyle(color: Colors.white)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("OK", style: TextStyle(color: Color(0xFF8A2BE2))),
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent, // Make background transparent for custom shape
+          insetPadding: const EdgeInsets.all(20), // Adds margin from screen edges
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2C2C2C), // Slightly lighter dark grey for contrast
+              borderRadius: BorderRadius.circular(20), // Smooth rounded corners
+              border: Border.all(
+                color: isError ? Colors.redAccent.withOpacity(0.5) : const Color(0xFF8A2BE2).withOpacity(0.5), 
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min, // Wrap content height
+              children: [
+                // 1. Optional Icon for visual punch
+                // Icon(
+                //   isError ? Icons.warning_amber_rounded : Icons.mark_email_read_rounded,
+                //   color: isError ? Colors.redAccent : const Color(0xFF8A2BE2),
+                //   size: 48,
+                // ),
+                // const SizedBox(height: 16),
+
+                // 2. The Title (Optional, you can remove if just passing message)
+                Text(
+                  "Oops!",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // 3. The Actual Message
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey[300],
+                    fontSize: 15,
+                    height: 1.4, // Better readability
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // 4. The Action Button
+                SizedBox(
+                  width: double.infinity, // Full width button
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8A2BE2),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      "OK",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
