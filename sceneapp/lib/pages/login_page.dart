@@ -76,6 +76,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
+      User? user = FirebaseAuth.instance.currentUser;
+if (user != null && !user.emailVerified) {
+  setLoading(false);
+  _showMessage("Please verify your email before logging in.", isError: true);
+  // Optional: Offer to resend email here
+  await FirebaseAuth.instance.signOut(); 
+  return; 
+}
       // No need to set loading false here, as we are navigating away
       if (mounted) {
         Navigator.pushReplacement(

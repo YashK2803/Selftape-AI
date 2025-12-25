@@ -56,13 +56,15 @@ class _SignUpPageState extends State<SignUpPage> with SingleTickerProviderStateM
   }
 
 void signUserUp() async {
-  if (usernameController.text.trim().isEmpty ||
+    // 1. Client-side Validation
+    if (usernameController.text.trim().isEmpty ||
         emailController.text.trim().isEmpty ||
         passwordController.text.trim().isEmpty ||
         confirmPasswordController.text.trim().isEmpty) {
       _showErrorMessage("Please fill in all fields.", isError: true);
       return;
     }
+
     // Show loading circle
     showDialog(
       context: context,
@@ -72,44 +74,118 @@ void signUserUp() async {
       ),
     );
 
-    // Try creating the user
     try {
       // Check passwords match
       if (passwordController.text != confirmPasswordController.text) {
-        Navigator.pop(context);
-        _showErrorMessage("Passwords don't match!");
+        Navigator.pop(context); // Pop loader
+        _showErrorMessage("Passwords don't match!", isError: true);
         return;
       }
 
-      // 1. Create User
-      UserCredential userCredential = 
+      // 2. Create User in Firebase
+      UserCredential userCredential =
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
-      // 2. SAVE USERNAME (Update Display Name)
+      // 3. Update Display Name
       if (userCredential.user != null) {
-        await userCredential.user!.updateDisplayName(usernameController.text.trim());
-        await userCredential.user!.reload(); // Refresh to make sure it sticks
+        await userCredential.user!
+            .updateDisplayName(usernameController.text.trim());
+        await userCredential.user!.reload();
       }
+
+      // 4. === SEND VERIFICATION EMAIL ===
+      if (userCredential.user != null && !userCredential.user!.emailVerified) {
+        await userCredential.user!.sendEmailVerification();
+      }
+      // ==================================
 
       // Pop loading circle
       if (mounted) Navigator.pop(context);
 
-      // Navigate to Home
+      // 5. Show Success Message & Redirect
+      // We explicitly sign them out so they can't enter the Home Page yet.
+      await FirebaseAuth.instance.signOut();
+
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomePage()),
+        // Show the "Check your email" dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false, // User must click OK
+          builder: (context) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(20),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2C2C2C),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: const Color(0xFF8A2BE2).withOpacity(0.5),
+                      width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10))
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.mark_email_read_rounded,
+                        color: Color(0xFF8A2BE2), size: 48),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Verify your email",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "A verification link has been sent to your email address. Please verify to log in.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white70, fontSize: 15),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          // Close dialog AND Sign Up page -> Back to Login
+                          Navigator.pop(context); // Close Dialog
+                          Navigator.pop(context); // Close Sign Up Page
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF8A2BE2),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text("Go to Login",
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       }
     } on FirebaseAuthException catch (e) {
-      if (mounted) Navigator.pop(context);
-      _showErrorMessage(e.code.replaceAll('-', ' '));
+      if (mounted) Navigator.pop(context); // Pop loader if error
+      _showErrorMessage(e.code.replaceAll('-', ' '), isError: true);
     }
   }
-
  void _showErrorMessage(String message, {bool isError = false}) {
     showDialog(
       context: context,
