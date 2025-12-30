@@ -59,6 +59,34 @@ source venv/bin/activate
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+### Configure Frontend Network (Important!)
+
+Before running the app, you must point the frontend to your computer's local network IP address.  
+The app **cannot** reach the server using `localhost` if running on a physical device or emulator.
+
+### 1. Find your computer's local IP address
+
+- **Windows**  
+  Run `ipconfig` in CMD and look for **IPv4 Address** under your Wi-Fi adapter.
+
+- **Mac/Linux**  
+  Run `ifconfig` or check **Network Settings**.
+
+### 2. Open the file
+
+```text
+sceneapp/lib/ip_address.dart
+```
+
+### 3. Update the Config.IP_ADDRESS variable with your IP
+
+```bash
+class Config {
+  // Replace with your actual machine IP (e.g., '192.168.1.5')
+  static const String IP_ADDRESS = "YOUR_LOCAL_IP_HERE";
+}
+```
+
 ### Setup and Run Frontend
 
 ```bash

@@ -70,6 +70,128 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   // --- GENERAL HELPERS ---
+  Widget _buildVideoListItem({
+    required String fileName,
+    required bool isDownloaded,
+    required VoidCallback onTap,
+    required Function(String) onMenuSelected,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        // Darker card background to stand out slightly from the main background
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // 1. VISUAL THUMBNAIL PLACEHOLDER
+                // Since we don't have real thumbnails yet, we make a stylish placeholder
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDownloaded
+                          ? [Colors.teal.withOpacity(0.6), Colors.green.withOpacity(0.6)]
+                          : [primaryColor.withOpacity(0.6), Colors.purpleAccent.withOpacity(0.6)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
+                ),
+                
+                const SizedBox(width: 16),
+
+                // 2. TEXT INFO
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        fileName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      // Status Chip (Badge)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isDownloaded 
+                              ? Colors.green.withOpacity(0.15) 
+                              : primaryColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          isDownloaded ? "Saved on Device" : "Cloud Storage",
+                          style: TextStyle(
+                            color: isDownloaded ? Colors.greenAccent : const Color(0xFFE0B0FF),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 3. ACTION MENU
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.white54),
+                  color: const Color(0xFF2C2C2C),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  onSelected: onMenuSelected,
+                  itemBuilder: (context) => [
+                    if (!isDownloaded)
+                      const PopupMenuItem(
+                        value: 'download',
+                        child: Row(children: [
+                          Icon(Icons.download_rounded, color: Colors.white, size: 20),
+                          SizedBox(width: 12),
+                          Text('Download', style: TextStyle(color: Colors.white)),
+                        ]),
+                      ),
+                    const PopupMenuItem(
+                      value: 'share',
+                      child: Row(children: [
+                        Icon(Icons.share_rounded, color: Colors.white, size: 20),
+                        SizedBox(width: 12),
+                        Text('Share', style: TextStyle(color: Colors.white)),
+                      ]),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(children: [
+                        Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                        SizedBox(width: 12),
+                        Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                      ]),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
   Future<void> _loadHistory() async {
     final prefs = await SharedPreferences.getInstance();
     List<String> historyList = prefs.getStringList('video_history') ?? [];
@@ -424,42 +546,57 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  // 2. HISTORY TAB
- Widget _buildHistoryTab() {
+Widget _buildHistoryTab() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const Center(child: Text("Please login"));
 
     return SafeArea(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 1. HEADING (Added back as requested)
           const Padding(
-            padding: EdgeInsets.fromLTRB(16, 120, 16, 16),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text("Your Cloud Tapes", 
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+            padding: EdgeInsets.fromLTRB(24, 30, 24, 10),
+            child: Text(
+              "Previous Recordings",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
-          
+
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: _storageService.getRecordingsStream(user.uid),
               builder: (context, snapshot) {
-                // 1. Loading State
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(
+                      child: CircularProgressIndicator(color: primaryColor));
                 }
 
-                // 2. Empty State
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text("No recordings in the cloud yet.", 
-                      style: TextStyle(color: Colors.grey)));
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.videocam_off_outlined,
+                            size: 60, color: Colors.grey[800]),
+                        const SizedBox(height: 16),
+                        const Text("No recordings yet.",
+                            style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                  );
                 }
 
                 final docs = snapshot.data!.docs;
 
                 return ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
                     final data = docs[index].data() as Map<String, dynamic>;
@@ -469,52 +606,32 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     final storagePath = data['storagePath'] ?? '';
 
                     return FutureBuilder<bool>(
-                      // Check if file exists locally
                       future: _checkLocalFile(fileName),
                       builder: (context, localSnapshot) {
                         bool isDownloaded = localSnapshot.data ?? false;
 
-                        return Card(
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          color: Colors.grey[900],
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          child: ListTile(
-                            leading: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: isDownloaded ? Colors.green.withOpacity(0.2) : primaryColor.withOpacity(0.2), 
-                                shape: BoxShape.circle
-                              ),
-                              child: Icon(
-                                isDownloaded ? Icons.check : Icons.cloud_download, 
-                                color: isDownloaded ? Colors.green : Colors.white
-                              ),
-                            ),
-                            title: Text(fileName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                            subtitle: Text(isDownloaded ? "On Device" : "In Cloud", 
-                                style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                            
-                            // THREE DOT MENU
-                            trailing: PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert, color: Colors.white70),
-                              color: Colors.grey[850],
-                              onSelected: (value) => _handleMenuAction(value, docId, storagePath, downloadUrl, fileName, isDownloaded),
-                              itemBuilder: (context) => [
-                                if (!isDownloaded)
-                                  const PopupMenuItem(value: 'download', child: Text('Download', style: TextStyle(color: Colors.white))),
-                                const PopupMenuItem(value: 'share', child: Text('Share', style: TextStyle(color: Colors.white))),
-                                const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.redAccent))),
-                              ],
-                            ),
-                            onTap: () {
-                              if (isDownloaded) {
-                                // TODO: Play video logic here using local path
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Playing local video...")));
-                              } else {
-                                _downloadFile(downloadUrl, fileName);
-                              }
-                            },
-                          ),
+                        return _buildVideoListItem(
+                          fileName: fileName,
+                          isDownloaded: isDownloaded,
+                          onTap: () {
+                            if (isDownloaded) {
+                              // Video is ready to play
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Opening Video Player...")));
+                              // TODO: Navigate to your VideoPlayerScreen here
+                            } else {
+                              // Video is NOT downloaded. 
+                              // 2. STOP AUTO-DOWNLOAD -> Show confirmation dialog instead.
+                              _confirmDownload(downloadUrl, fileName);
+                            }
+                          },
+                          onMenuSelected: (value) => _handleMenuAction(
+                              value,
+                              docId,
+                              storagePath,
+                              downloadUrl,
+                              fileName,
+                              isDownloaded),
                         );
                       },
                     );
@@ -528,8 +645,39 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  // --- HELPER FUNCTIONS FOR HISTORY ---
-
+  // --- Add this Helper Function inside _HomePageState ---
+  
+  void _confirmDownload(String url, String fileName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("Download Video?", style: TextStyle(color: Colors.white)),
+        content: Text(
+          "You need to download '$fileName' to watch it.",
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx); // Close dialog
+              _downloadFile(url, fileName); // Start download
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("Download"),
+          ),
+        ],
+      ),
+    );
+  }
   Future<bool> _checkLocalFile(String fileName) async {
     final dir = await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/$fileName');
@@ -541,9 +689,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     try {
       await _storageService.downloadVideo(url, fileName);
       setState(() {}); // Refresh UI to show Green Check
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Download Complete!")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Saved to Gallery!")));
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      }
     }
   }
 
@@ -570,8 +722,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       bool confirm = await showDialog(
         context: context, 
         builder: (c) => AlertDialog(
-          title: const Text("Delete Recording?"),
-          content: const Text("This will delete it from the cloud and your device."),
+          backgroundColor: Colors.grey[900],
+          title: const Text("Delete Recording?", style: TextStyle(color: Colors.white)),
+          content: const Text("This will delete it from the cloud and your device.", style: TextStyle(color: Colors.white70)),
           actions: [
             TextButton(onPressed: () => Navigator.pop(c, false), child: const Text("Cancel")),
             TextButton(onPressed: () => Navigator.pop(c, true), child: const Text("Delete", style: TextStyle(color: Colors.red))),
@@ -580,18 +733,27 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ) ?? false;
 
       if (confirm) {
-        // 1. Delete Cloud
-        await _storageService.deleteVideo(docId, storagePath);
-        await _storageService.deleteFirestoreDoc(user.uid, docId);
-        
-        // 2. Delete Local (Optional cleanup)
-        final dir = await getApplicationDocumentsDirectory();
-        final file = File('${dir.path}/$fileName');
-        if (await file.exists()) {
-          await file.delete();
+        try {
+          // 1. Delete from Cloud & DB
+          // NOTE: We must pass user.uid because our StorageService requires it for DB cleanup.
+          await _storageService.deleteVideo(user.uid, docId, storagePath);
+          
+          // 2. Delete Local File (Cleanup)
+          final dir = await getApplicationDocumentsDirectory();
+          final file = File('${dir.path}/$fileName');
+          if (await file.exists()) {
+            await file.delete();
+          }
+          
+          setState(() {}); // Refresh UI (though StreamBuilder usually handles this)
+          if (mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Deleted.")));
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error deleting: $e")));
+          }
         }
-        
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Deleted.")));
       }
     }
   }

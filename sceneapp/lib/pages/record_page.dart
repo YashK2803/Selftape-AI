@@ -47,6 +47,7 @@ class _RecordingPageState extends State<RecordingPage> {
   final AudioPlayer _effectPlayer = AudioPlayer();
   // Inside _RecordingPageState class
 bool _isMicActive = false; // <--- ADD THIS
+double _uploadProgress = 0.0;
 
   bool _isPlayerInited = false;
   bool _isPlaying = false;
@@ -130,7 +131,7 @@ bool _isMicActive = false; // <--- ADD THIS
       (camera) => camera.lensDirection == CameraLensDirection.front,
       orElse: () => widget.cameras.first,
     );
-    _controller = CameraController(frontCamera, ResolutionPreset.max, enableAudio: false);
+    _controller = CameraController(frontCamera, ResolutionPreset.max, enableAudio: true,imageFormatGroup: ImageFormatGroup.jpeg,);
     try {
       await _controller!.initialize();
       if (mounted) setState(() {});
@@ -176,48 +177,100 @@ bool _isMicActive = false; // <--- ADD THIS
     if (mounted) setState(() => _isMicActive = false);
   }
 
+  // lib/pages/recording_page.dart
+
   Future<void> saveRecordingToCloud(String videoFilePath, String customFileName) async {
     final user = FirebaseAuth.instance.currentUser;
-    
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("You must be logged in to upload!")),
-      );
-      return;
-    }
+    if (user == null) return;
 
-    setState(() {
-      _isUploading = true; 
-    });
+    // 1. Show Progress Dialog IMMEDIATELY
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevent user from closing it
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E1E1E),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 10),
+                  const CircularProgressIndicator(color: Color(0xFF8A2BE2)),
+                  const SizedBox(height: 20),
+                  const Text(
+                    "Optimizing & Uploading...",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                  // PROGRESS BAR
+                  LinearProgressIndicator(
+                    value: _uploadProgress,
+                    backgroundColor: Colors.grey[800],
+                    color: const Color(0xFF8A2BE2),
+                    minHeight: 6,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    "${(_uploadProgress * 100).toStringAsFixed(0)}%",
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
 
     try {
+      // 2. Start Upload with Progress Callback
       String finalName = "$customFileName.mp4";
-      await _storageService.uploadVideo(videoFilePath, finalName, user.uid);
+      
+      await _storageService.uploadVideo(
+        videoFilePath, 
+        finalName, 
+        user.uid, 
+        (progress) {
+          // Update global variable and trigger UI rebuild
+          setState(() {
+            _uploadProgress = progress;
+          });
+          
+          // Hack to force the Dialog (which is a different widget tree) to rebuild
+          // In a cleaner app, you'd use ValueNotifier, but this works:
+          (context as Element).markNeedsBuild();
+        }
+      );
 
+      // 3. Close Dialog and Navigate Home on Success
       if (mounted) {
+        Navigator.pop(context); // Close Progress Dialog
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Upload Complete! 🎉")),
+          const SnackBar(
+            content: Text("Upload Complete! 🎉"),
+            backgroundColor: Colors.green,
+          ),
         );
+
+        // Navigate Home
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const HomePage()),
           (Route<dynamic> route) => false,
         );
       }
+
     } catch (e) {
       if (mounted) {
+        Navigator.pop(context); // Close Progress Dialog
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Upload Failed: $e")),
+          SnackBar(content: Text("Upload Failed: $e"), backgroundColor: Colors.red),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUploading = false;
-        });
       }
     }
   }
-
   Future<void> _playAudioFromBytes(List<int> audioBytes) async {
     if (!_isPlayerInited) return;
     if (_isPlaying) {
@@ -258,6 +311,7 @@ bool _isMicActive = false; // <--- ADD THIS
       final uri = Uri.parse('ws://${Config.IP_ADDRESS}:8000/ws-dialogue/');
       _channel = IOWebSocketChannel.connect(uri);
       _channel!.stream.listen((message) async {
+        if (!_isRecording) return;
         try {
 if (message is String) {
             final decoded = json.decode(message);
